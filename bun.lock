@@ -1,0 +1,22 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "dependencies": {
+        "rozod": "^6.9.0",
+      },
+    },
+  },
+  "packages": {
+    "parse-roblox-errors": ["parse-roblox-errors@1.2.2", "", { "dependencies": { "whatwg-mimetype": "5.0.0" } }, "sha512-HqzYHhBvmMscbeRIjaymX5e36akfbXurlLM1UdlBWzqLpJlntih8rcw0b5DE8XvI8/w8AguOVJ8bAhTJBiMfYA=="],
+
+    "roblox-bat": ["roblox-bat@0.6.5", "", {}, "sha512-aHcCSTT92uze1u4zKyG6AUR+IGzTTBnVSAZj6U/a9wIhQT7aid0iKrVu2ts4RXD+hMrV0xSN9YnpCR6hhQkW9Q=="],
+
+    "rozod": ["rozod@6.9.0", "", { "dependencies": { "parse-roblox-errors": "^1.2.2", "roblox-bat": "^0.6.5", "zod": "^4.3.6" } }, "sha512-8AbpHXWsO7F9ITw+BBJKkMHT69NOfOjRdp8QQSG+CMaSobQEokkBKeO5nV8CO3V+KxFOTMHlVwqFrpan43pOhw=="],
+
+    "whatwg-mimetype": ["whatwg-mimetype@5.0.0", "", {}, "sha512-sXcNcHOC51uPGF0P/D4NVtrkjSU2fNsm9iog4ZvZJsL3rjoDAzXZhkm2MWt1y+PUdggKAYVoMAIYcs78wJ51Cw=="],
+
+    "zod": ["zod@4.4.3", "", {}, "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ=="],
+  }
+}
