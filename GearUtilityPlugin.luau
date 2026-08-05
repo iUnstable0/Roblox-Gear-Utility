@@ -619,7 +619,7 @@ local function LoadGearsOperation(FixGears)
 	print("Fetching gears list")
 
 	local Gears = HttpService:JSONDecode(
-		HttpService:GetAsync("https://raw.githubusercontent.com/iUnstable0/Roblox/main/Gears-Detailed.json")
+		HttpService:GetAsync("https://raw.githubusercontent.com/iUnstable0/Roblox-Gear-Utility/main/Gears-Detailed.json")
 	)
 
 	print(
