@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "minify-json": "bun run minify-json.ts"
+  },
   "dependencies": {
     "rozod": "^6.9.0"
   }
