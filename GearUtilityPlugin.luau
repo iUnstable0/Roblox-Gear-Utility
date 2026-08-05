@@ -444,11 +444,11 @@ local function LoadGears(FixGears)
 				end
 
 				if not IsGear then
-						NewGearEntry.Parent = FailedGearsFolder
+					NewGearEntry.Parent = FailedGearsFolder
 
-						for _, Child in ipairs(InsertedModel:GetChildren()) do
-							Child.Parent = NewGearEntry
-						end
+					for _, Child in ipairs(InsertedModel:GetChildren()) do
+						Child.Parent = NewGearEntry
+					end
 				end
 
 				InsertedModel:Destroy()
