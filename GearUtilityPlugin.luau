@@ -23,7 +23,7 @@ local FixObjectButton = Toolbar:CreateButton(
 	"Fix object and its children",
 	"rbxassetid://6172144323"
 )
-local UpdateModulePackagesButton = Toolbar:CreateButton(
+local LoadModulesButton = Toolbar:CreateButton(
 	"Update Packages",
 	"Update gear module packages",
 	"rbxassetid://6022668955"
@@ -44,10 +44,9 @@ local GearAttributeKeys = {
 	"isOffSale",
 }
 
-local LoadLibraryFunction = "local function LoadLibrary(Library)"
 local TreeTab = "\t\t\t\t\t"
 
-local READMESource = [[
+local READMESource = [=[
 	--[[
 		This folder contains gears that GearUtility failed to load in.
 
@@ -74,116 +73,319 @@ local READMESource = [[
 			- 445118715 .
 
 		If you see any other gears that failed to load in that is not listed above, just re-run "Load Gears" and the plugin will try to load them in again
-	\]\]--
-]]
+	]]
+]=]
 
 local function ParseModulePath(ModuleName)
 	return `game:GetService("ReplicatedStorage").GearModulesFolder.{ModuleName}`
 end
 
-local LoadLibraryRequire = `require({ParseModulePath("LoadLibrary")})(Library)`
-
 -- 225918694 NOT FOR SALE
 -- 187430232 GONE
 -- 376407361 GONE
 
-local ReplaceList = {
-	[754568173] = ParseModulePath("SwordModule"), -- Sword Module
-	[172349822] = ParseModulePath("GearModule"), -- Gear Module
-	[191816425] = ParseModulePath("MultiPurposeModule"), -- Multi Purpose Module
-	[201433042] = ParseModulePath("ScaleCharacterModule"), -- Scale Character Module
-	[1075123174] = ParseModulePath("GearService"), -- GearService
-	[199238756] = ParseModulePath("SkateboardModule"), -- Skateboard Module
-	[836581200] = ParseModulePath("PackageMaker"), -- Package Maker
-	[180464321] = ParseModulePath("HalloweenMonsterCustomesLibrary"), -- Halloween Monster Costumes Library
-	[185791213] = ParseModulePath("GuitarModule"), -- Guitar Module
-	[236215724] = ParseModulePath("SwapGear"), -- Swap Gear
-	[206209239] = ParseModulePath("GLib"), -- GLib
-	[242620010] = ParseModulePath("ROrbTool"), -- O-Orb Tool
-	[182191976] = ParseModulePath("HalloweenFireworkLibrary"), -- Halloween Firework Library
-	[215583981] = ParseModulePath("DusekCarCarHandle"), -- Dusek Car CarHandle
-	[215075770] = ParseModulePath("IglooOfSolitudeSnowHat"), -- Igloo Of Solitude Snow Hat
-	[230095940] = ParseModulePath("GrannyCrossbowBolt"), -- Granny's Crossbow Bolt
-	[277359293] = ParseModulePath("DinoPlushAssets"), -- Dino Plush Assets
-
-	["NPCModule = require%(game%.ServerScriptService%.MainModule%)"] =
-		`NPCModule = require({ParseModulePath("MultiPurposeModule")})`,
+local ModuleList = {
+	{ AssetId = 754568173, ModuleName = "SwordModule" }, -- Sword Module
+	{ AssetId = 172349822, ModuleName = "GearModule" }, -- Gear Module
+	{ AssetId = 191816425, ModuleName = "MultiPurposeModule" }, -- Multi Purpose Module
+	{ AssetId = 201433042, ModuleName = "ScaleCharacterModule" }, -- Scale Character Module
+	{ AssetId = 1075123174, ModuleName = "GearService" }, -- GearService
+	{ AssetId = 199238756, ModuleName = "SkateboardModule" }, -- Skateboard Module
+	{ AssetId = 836581200, ModuleName = "PackageMaker" }, -- Package Maker
+	{ AssetId = 180464321, ModuleName = "HalloweenMonsterCustomesLibrary" }, -- Halloween Monster Costumes Library
+	{ AssetId = 185791213, ModuleName = "GuitarModule" }, -- Guitar Module
+	{ AssetId = 236215724, ModuleName = "SwapGear" }, -- Swap Gear
+	{ AssetId = 206209239, ModuleName = "GLib" }, -- GLib
+	{ AssetId = 242620010, ModuleName = "ROrbTool" }, -- O-Orb Tool
+	{ AssetId = 182191976, ModuleName = "HalloweenFireworkLibrary" }, -- Halloween Firework Library
+	{ AssetId = 215583981, ModuleName = "DusekCarCarHandle" }, -- Dusek Car CarHandle
+	{ AssetId = 215075770, ModuleName = "IglooOfSolitudeSnowHat" }, -- Igloo Of Solitude Snow Hat
+	{ AssetId = 230095940, ModuleName = "GrannyCrossbowBolt" }, -- Granny's Crossbow Bolt
+	{ AssetId = 277359293, ModuleName = "DinoPlushAssets" }, -- Dino Plush Assets
 }
 
 local LoadGearsCooldown = false
+local FixObjectCooldown = false
+local LoadModulesCooldown = false
 
 local function IsScript(Object)
 	return Object:IsA("Script") or Object:IsA("LocalScript") or Object:IsA("ModuleScript")
 end
 
-local function CreateTestScript()
-	local Success = pcall(function()
-		local NewScript = Instance.new("Script")
+-- gets the index of the end of a long bracket (long string/long comment [[...]] or [=*[...]=*] etc.)
+local function GetLongBracketEndIndex(Source, StartIndex)
+	local EqualSigns = Source:sub(StartIndex):match("^%[(=*)%[")
 
-		NewScript.Name = "GearUtility_TestScript"
+	if EqualSigns == nil then
+		return nil
+	end
+
+	local ClosingDelimiter = `]{EqualSigns}]`
+
+	local ContentIndex = StartIndex + #EqualSigns + 2
+
+	local _, ClosingIndex = Source:find(ClosingDelimiter, ContentIndex, true)
+
+	return ClosingIndex or #Source
+end
+
+-- same as the function above but for strings
+local function GetStringEndIndex(Source, StartIndex, Quote)
+	local ContentIndex = StartIndex + 1
+
+	while ContentIndex <= #Source do
+		local TargetChar = Source:sub(ContentIndex, ContentIndex)
+
+		-- print(ContentIndex)
+
+		if TargetChar == "\\" then
+			-- print(`found escape, skip escape and next char ({TargetChar}{Source:sub(ContentIndex + 1, ContentIndex + 1)})`)
+			ContentIndex += 2
+		elseif TargetChar == Quote then
+			-- print("found end quote!")
+			return ContentIndex
+		else
+			-- print(`{TargetChar} not quote`)
+			ContentIndex += 1
+		end
+	end
+
+	-- print("didnt find quote, return length of source")
+	return #Source
+end
+
+local function RewriteCodeSegments(Source, RewriteSegment)
+	local Pieces = {}
+
+	local SegmentStart = 1
+	local Index = 1
+	local TotalReplaced = 0
+
+	local function AppendCodeSegment(EndIndex)
+		if EndIndex < SegmentStart then
+			return
+		end
+
+		local RewrittenSegment, Count = RewriteSegment(
+			Source:sub(SegmentStart, EndIndex)
+		)
+
+		table.insert(Pieces, RewrittenSegment)
+
+		TotalReplaced += Count or 0
+	end
+
+	while Index <= #Source do
+		local Character = Source:sub(Index, Index)
+
+		local ProtectedEnd = nil
+
+		if Character == "\"" or Character == "'" or Character == "`" then
+			ProtectedEnd = GetStringEndIndex(Source, Index, Character)
+		elseif Character == "-" and Source:sub(Index, Index + 1) == "--" then
+			ProtectedEnd = GetLongBracketEndIndex(Source, Index + 2)
+
+			if ProtectedEnd == nil then
+				local NewlineIndex = Source:find("\n", Index + 2, true)
+				ProtectedEnd = if NewlineIndex then NewlineIndex - 1 else #Source
+			end
+		elseif Character == "[" then
+			ProtectedEnd = GetLongBracketEndIndex(Source, Index)
+		end
+
+		if ProtectedEnd then
+			AppendCodeSegment(Index - 1)
+
+			table.insert(Pieces, Source:sub(Index, ProtectedEnd))
+
+			Index = ProtectedEnd + 1
+			SegmentStart = Index
+		else
+			Index += 1
+		end
+	end
+
+	AppendCodeSegment(#Source)
+
+	return table.concat(Pieces), TotalReplaced
+end
+
+local function ReplaceStandalonePattern(Segment, Pattern, Replacement)
+	local TotalReplaced = 0
+	local Count = 0
+
+	Segment, Count = Segment:gsub(`^{Pattern}`, function()
+		return Replacement
+	end)
+
+	TotalReplaced += Count
+
+	Segment, Count = Segment:gsub(
+		`([^%w_%.:]){Pattern}`,
+		function(Prefix)
+			return Prefix .. Replacement
+		end
+	)
+
+	TotalReplaced += Count
+
+	return Segment, TotalReplaced
+end
+
+local function FixModuleCalls(Source)
+	return RewriteCodeSegments(Source, function(Segment)
+		local TotalReplaced = 0
+
+		for _, Module in ipairs(ModuleList) do
+			local RequirePattern = `require%f[^%w_]%s*%(%s*{tostring(Module.AssetId)}%s*%)`
+
+			local ReplacementCall = `require({ParseModulePath(Module.ModuleName)})`
+			local Count
+
+			Segment, Count = ReplaceStandalonePattern(
+				Segment,
+				RequirePattern,
+				ReplacementCall
+			)
+
+			TotalReplaced += Count
+		end
+
+		local NPCModulePattern = "NPCModule%f[^%w_]%s*=%s*"
+			.. "require%f[^%w_]%s*%(%s*"
+			.. "game%.ServerScriptService%.MainModule%s*%)"
+
+		local NPCModuleReplacement =
+			`NPCModule = require({ParseModulePath("MultiPurposeModule")})`
+		local NPCCount
+
+		Segment, NPCCount = ReplaceStandalonePattern(
+			Segment,
+			NPCModulePattern,
+			NPCModuleReplacement
+		)
+
+		TotalReplaced += NPCCount
+
+		return Segment, TotalReplaced
+	end)
+end
+
+local function FindPattern(Source, Pattern)
+	local Found = false
+
+	RewriteCodeSegments(Source, function(Segment)
+		if not Found and Segment:find(Pattern) then
+			Found = true
+		end
+
+		return Segment, 0
+	end)
+
+	return Found
+end
+
+local function FindStandalonePattern(Source, Pattern)
+	if FindPattern(Source, `^{Pattern}`) then
+		return true
+	end
+
+	return FindPattern(Source, `[^%w_%.:]{Pattern}`)
+end
+
+local function TryCreateTestScript()
+	local NewScript = Instance.new("Script")
+	local Success, Error = pcall(function()
+		NewScript.Name = `GearUtility_TestScript_{HttpService:GenerateGUID(false)}`
 		NewScript.Parent = JointsService
 	end)
 
-	return Success
+	if not Success then
+		NewScript:Destroy()
+		return false, Error
+	end
+
+	return true, NewScript
 end
 
-local function EditTestScript(Script)
+local function EditTestScript(TestScript)
 	return pcall(function()
-		Script.Source = 'print("Works!")'
+		TestScript.Source = 'print("Works!")'
 	end)
 end
 
 local function CheckScriptPermission()
-	local Success = CreateTestScript()
+	local Success, Result = TryCreateTestScript()
 
 	if not Success then
 		print("Please allow plugin access to create scripts")
 
 		repeat
 			task.wait(1)
-		until CreateTestScript()
+			Success, Result = TryCreateTestScript()
+		until Success
 	end
 
-	Success = EditTestScript(JointsService:WaitForChild("GearUtility_TestScript"))
+	local TestScript = Result
+	Success = EditTestScript(TestScript)
 
 	if not Success then
 		print("Please allow plugin access to edit scripts")
 
 		repeat
 			task.wait(1)
-		until EditTestScript(JointsService:WaitForChild("GearUtility_TestScript"))
+			Success = EditTestScript(TestScript)
+		until Success
 	end
 
-	for _, Object in ipairs(JointsService:GetChildren()) do
-		if Object:IsA("Script") and Object.Name == "GearUtility_TestScript" then
-			Object:Destroy()
-		end
-	end
+	TestScript:Destroy()
 end
 
 local function FixScript(Script)
-	local NeedModules = false
-	local Fixed = false
+	local OriginalSource = Script.Source
 
-	if Script.Source:find("LoadLibrary") then
-		NeedModules = true
+	local UpdatedSource, Count = FixModuleCalls(OriginalSource)
 
-		if not Script.Source:find(LoadLibraryFunction, 1, true) then
-			local LoadLibraryCode = LoadLibraryFunction .. "\n"
-			LoadLibraryCode ..= "\treturn " .. LoadLibraryRequire .. "\n"
-			LoadLibraryCode ..= "end"
+	local NeedModules = Count > 0 or FindPattern(
+		UpdatedSource,
+		"%.%s*GearModulesFolder%f[^%w_]"
+	)
 
-			Script.Source = LoadLibraryCode .. "\n\n" .. Script.Source
-			Fixed = true
+	local HasLoadLibrary = FindStandalonePattern(
+		UpdatedSource,
+		"LoadLibrary%f[^%w_]%s*%("
+	)
+
+	if HasLoadLibrary then
+		local LoadLibraryFixed = FindPattern(
+			UpdatedSource,
+			"%f[%w_]function%f[^%w_]%s+LoadLibrary%f[^%w_]%s*%("
+		)
+
+		if not LoadLibraryFixed then
+			LoadLibraryFixed = FindPattern(
+				UpdatedSource,
+				"%f[%w_]local%f[^%w_]%s+LoadLibrary%f[^%w_]"
+			)
+		end
+
+		if not LoadLibraryFixed then
+			LoadLibraryFixed = FindStandalonePattern(
+				UpdatedSource,
+				"LoadLibrary%f[^%w_]%s*="
+			)
+		end
+
+		if not LoadLibraryFixed then
+			NeedModules = true
+			UpdatedSource = `local function LoadLibrary(Library)\n\treturn require({ParseModulePath("LoadLibrary")})(Library)\nend\n\n{UpdatedSource}`
 		end
 	end
 
-	for Key, Value in pairs(ReplaceList) do
-		if Script.Source:find(Key) then
-			NeedModules = true
-			Script.Source = Script.Source:gsub(Key, Value)
-			Fixed = true
-		end
+	local Fixed = UpdatedSource ~= OriginalSource
+
+	if Fixed then
+		Script.Source = UpdatedSource
 	end
 
 	return NeedModules, Fixed, Script.ClassName
@@ -198,17 +400,17 @@ local function Fix(Object)
 		ModuleScript = 0,
 	}
 
-	print(`Fixing {Object:GetFullName()}`)
+	print(`Fixing everything inside {Object:GetFullName()}`)
 
 	local Time = os.time()
 	local TotalFixed = 0
-	local CreateModule = false
+	local RequireModules = false
 
 	if IsScript(Object) then
 		local NeedModules, Fixed, ScriptType = FixScript(Object)
 
 		if NeedModules then
-			CreateModule = true
+			RequireModules = true
 		end
 
 		if Fixed then
@@ -222,7 +424,7 @@ local function Fix(Object)
 			local NeedModules, Fixed, ScriptType = FixScript(Descendant)
 
 			if NeedModules then
-				CreateModule = true
+				RequireModules = true
 			end
 
 			if Fixed then
@@ -244,38 +446,77 @@ local function Fix(Object)
 	ChangeHistoryService:SetWaypoint(`Fixed {Object:GetFullName()} and its descendants`)
 	Selection:Set({ Object })
 
-	return CreateModule
+	return RequireModules
 end
 
-local function UpdateModulePackage()
-	print("Updating gear module packages")
+local function LoadModulesOperation()
+	print("Loading gear modules")
 
 	local Time = os.time()
-	local GearModulesFolder = ReplicatedStorage:FindFirstChild("GearModulesFolder")
+	local ExistingGearModulesFolder = ReplicatedStorage:FindFirstChild("GearModulesFolder")
+	local GearModules = script:FindFirstChild("GearModulesFolder")
 
-	if GearModulesFolder then
-		GearModulesFolder:Destroy()
+	if not GearModules then
+		error("Gear modules package is missing from the plugin. Please create a bug report on GitHub", 0)
 	end
 
-	GearModulesFolder = script.GearModulesFolder:Clone()
-	GearModulesFolder.Parent = ReplicatedStorage
+	local NewGearModulesFolder = GearModules:Clone()
+	NewGearModulesFolder.Name = `GearModulesFolder_{HttpService:GenerateGUID(false)}`
 
-	Fix(GearModulesFolder)
+	local Success, Error = xpcall(function()
+		NewGearModulesFolder.Parent = ReplicatedStorage
+		Fix(NewGearModulesFolder)
+	end, debug.traceback)
+
+	if not Success then
+		NewGearModulesFolder:Destroy()
+		error(Error, 0)
+	end
+
+	NewGearModulesFolder.Name = "GearModulesFolder"
+
+	if ExistingGearModulesFolder then
+		ExistingGearModulesFolder:Destroy()
+	end
 
 	print(
-		"Gear module packages updated"
+		"Gear module packages loaded"
 			.. `\n{TreeTab}- Time taken: {os.time() - Time} seconds`
 	)
 end
 
-local function LoadGears(FixGears)
-	if LoadGearsCooldown then
-		warn("Gears are still loading. Please wait before trying again.")
-		return
+local function LoadModules()
+	if LoadModulesCooldown then
+		warn("Modules are still loading. Please wait before trying again.")
+		return false
 	end
 
-	LoadGearsCooldown = true
+	LoadModulesCooldown = true
 
+	local Success, Error = xpcall(LoadModulesOperation, debug.traceback)
+
+	LoadModulesCooldown = false
+
+	if not Success then
+		warn(`Failed to load gear module packages:\n{Error}`)
+	end
+
+	return Success
+end
+
+local function CountFailedGearEntries(FailedGearsFolder)
+	local Count = 0
+
+	for _, Child in ipairs(FailedGearsFolder:GetChildren()) do
+		if Child:IsA("Folder") then
+			Count += 1
+		end
+	end
+
+	return Count
+end
+
+local function LoadGearsOperation(FixGears)
 	print("Initializing")
 
 	local FailedGearsFolder = ServerStorage:FindFirstChild("FailedGears")
@@ -292,7 +533,6 @@ local function LoadGears(FixGears)
 		ChangeHistoryService:SetWaypoint("Created FailedGears folder")
 	end
 
-	local FailedGears = FailedGearsFolder:GetChildren()
 	local README = FailedGearsFolder:FindFirstChild("README")
 
 	if not README then
@@ -307,9 +547,13 @@ local function LoadGears(FixGears)
 		README.Source = READMESource
 	end
 
-	if #FailedGears > 1 or (#FailedGears > 0 and not README) then
+	ChangeHistoryService:SetWaypoint("Initialized README")
+
+	local FailedGearCount = CountFailedGearEntries(FailedGearsFolder)
+
+	if FailedGearCount > 0 then
 		print(
-			`Found {#FailedGears} failed gears`
+			`Found {FailedGearCount} failed gears`
 				.. "; the plugin will try to load them again"
 		)
 	end
@@ -326,29 +570,50 @@ local function LoadGears(FixGears)
 		return `{Gear.id} {Gear.name}`
 	end
 
+	local function FindGearEntry(TargetFolder, GearId)
+		local TargetGearEntry
+
+		for _, GearEntry in ipairs(TargetFolder:GetChildren()) do
+			if GearEntry:IsA("Folder") and GearEntry:GetAttribute("data_id") == GearId then
+				if TargetGearEntry then
+					GearEntry:Destroy()
+				else
+					TargetGearEntry = GearEntry
+				end
+			end
+		end
+
+		return TargetGearEntry
+	end
+
+	local function UpdateGearEntry(GearEntry, Gear)
+		GearEntry.Name = FormatGearEntryName(Gear)
+
+		for _, Key in ipairs(GearAttributeKeys) do
+			GearEntry:SetAttribute(`data_{Key}`, Gear[Key])
+		end
+	end
+
 	local function CreateGearEntry(Gear, TargetFolder)
 		local GearEntryName = FormatGearEntryName(Gear)
-		local TargetGearEntry = TargetFolder:FindFirstChild(GearEntryName)
+		local TargetGearEntry = FindGearEntry(TargetFolder, Gear.id)
 
 		if TargetGearEntry then
+			UpdateGearEntry(TargetGearEntry, Gear)
+
 			warn(
 				`Skipping {GearEntryName}`
 					.. ` because it already exists in {TargetFolder:GetFullName()}`
 			)
 
-			return TargetGearEntry
+			return TargetGearEntry, false
 		end
 
 		local NewGearEntry = Instance.new("Folder")
-		NewGearEntry.Name = GearEntryName
-
-		for _, Key in ipairs(GearAttributeKeys) do
-			NewGearEntry:SetAttribute(`data_{Key}`, Gear[Key])
-		end
-
+		UpdateGearEntry(NewGearEntry, Gear)
 		NewGearEntry.Parent = TargetFolder
 
-		return NewGearEntry
+		return NewGearEntry, true
 	end
 
 	print("Fetching gears list")
@@ -368,7 +633,7 @@ local function LoadGears(FixGears)
 	local FilteredGears = {}
 
 	for _, Gear in ipairs(Gears.data) do
-		if not string.find(string.lower(tostring(Gear.name)), "roblox tablet", 1, true) then
+		if not tostring(Gear.name):lower():find("roblox tablet", 1, true) then
 			table.insert(FilteredGears, Gear)
 		end
 	end
@@ -390,13 +655,17 @@ local function LoadGears(FixGears)
 		local ExistingGearIds = {}
 
 		for _, Gear in ipairs(GearsFolder:GetChildren()) do
-			table.insert(ExistingGearIds, Gear:GetAttribute("data_id"))
+			local ExistingGearId = Gear:GetAttribute("data_id")
+
+			if ExistingGearId ~= nil then
+				ExistingGearIds[ExistingGearId] = true
+			end
 		end
 
 		local MissingGears = {}
 
 		for _, Gear in ipairs(Gears.data) do
-			if not table.find(ExistingGearIds, Gear.id) then
+			if not ExistingGearIds[Gear.id] then
 				table.insert(MissingGears, Gear)
 			end
 		end
@@ -416,42 +685,63 @@ local function LoadGears(FixGears)
 
 	for _, Gear in ipairs(Gears.data) do
 		task.spawn(function()
+			local InsertedModel
+			local NewGearEntry
+
+			local NewGearEntryWasCreated = false
+
 			local OperationSucceeded, Result, Detail = xpcall(function()
 				local LoadSucceeded, InsertedModelOrError = pcall(function()
 					return InsertService:LoadAsset(Gear.id)
 				end)
 
-				local FailedGearEntry = FailedGearsFolder:FindFirstChild(FormatGearEntryName(Gear))
+				local FailedGearEntry = FindGearEntry(FailedGearsFolder, Gear.id)
 				local GearPreviouslyFailed = FailedGearEntry ~= nil
 
-				local IsGear = false
-
 				if not LoadSucceeded then
-					CreateGearEntry(Gear, FailedGearsFolder)
+					NewGearEntry, NewGearEntryWasCreated = CreateGearEntry(Gear, FailedGearsFolder)
+
 					return "load_failed", InsertedModelOrError
 				end
 
-				local InsertedModel = InsertedModelOrError
-				local NewGearEntry = CreateGearEntry(Gear, GearsFolder)
+				InsertedModel = InsertedModelOrError
 
+				local IsGear = false
 
 				for _, Child in ipairs(InsertedModel:GetChildren()) do
 					if Child:IsA("Tool") or Child:IsA("HopperBin") then
 						IsGear = true
-
-						Child.Parent = NewGearEntry
+						break
 					end
 				end
 
-				if not IsGear then
-					NewGearEntry.Parent = FailedGearsFolder
+				if IsGear then
+					NewGearEntry, NewGearEntryWasCreated = CreateGearEntry(Gear, GearsFolder)
 
+					for _, Child in ipairs(InsertedModel:GetChildren()) do
+						if Child:IsA("Tool") or Child:IsA("HopperBin") then
+							Child.Parent = NewGearEntry
+						end
+					end
+				elseif FailedGearEntry then
+					NewGearEntry = FailedGearEntry
+					UpdateGearEntry(NewGearEntry, Gear)
+
+					for _, Child in ipairs(NewGearEntry:GetChildren()) do
+						Child:Destroy()
+					end
+				else
+					NewGearEntry, NewGearEntryWasCreated = CreateGearEntry(Gear, FailedGearsFolder)
+				end
+
+				if not IsGear then
 					for _, Child in ipairs(InsertedModel:GetChildren()) do
 						Child.Parent = NewGearEntry
 					end
 				end
 
 				InsertedModel:Destroy()
+				InsertedModel = nil
 
 				if not IsGear then
 					return "load_failed", `Asset is not a gear (didn't find either a "Tool" or a "HopperBin" in the model)`
@@ -459,6 +749,7 @@ local function LoadGears(FixGears)
 
 				if FailedGearEntry then
 					FailedGearEntry:Destroy()
+					-- print(`Removed previous failed gear entry for {Gear.name} ({Gear.id}) because it was successfully loaded`)
 				end
 
 				if GearPreviouslyFailed then
@@ -470,6 +761,20 @@ local function LoadGears(FixGears)
 
 			Completed += 1
 			local Progress = Completed
+
+			if not OperationSucceeded then
+				if InsertedModel then
+					pcall(function()
+						InsertedModel:Destroy()
+					end)
+				end
+
+				if NewGearEntryWasCreated and NewGearEntry and NewGearEntry.Parent then
+					pcall(function()
+						NewGearEntry:Destroy()
+					end)
+				end
+			end
 
 			if not OperationSucceeded then
 				Failed += 1
@@ -523,16 +828,33 @@ local function LoadGears(FixGears)
 	)
 
 	if FixGears and Fix(GearsFolder) then
-		UpdateModulePackage()
+		LoadModules()
+	end
+end
+
+local function LoadGears(FixGears)
+	if LoadGearsCooldown then
+		warn("Gears are still loading. Please wait before trying again.")
+		return
 	end
 
+	LoadGearsCooldown = true
+
+	local Success, Error = xpcall(function()
+		LoadGearsOperation(FixGears)
+	end, debug.traceback)
+
 	LoadGearsCooldown = false
+
+	if not Success then
+		warn(`Gear loading stopped because of an unexpected error:\n{Error}`)
+	end
 end
 
 LoadGearsButton.ClickableWhenViewportHidden = true
 LoadGearsWithoutFixingButton.ClickableWhenViewportHidden = true
 FixObjectButton.ClickableWhenViewportHidden = true
-UpdateModulePackagesButton.ClickableWhenViewportHidden = true
+LoadModulesButton.ClickableWhenViewportHidden = true
 
 LoadGearsButton.Click:Connect(function()
 	LoadGears(true)
@@ -543,21 +865,36 @@ LoadGearsWithoutFixingButton.Click:Connect(function()
 end)
 
 FixObjectButton.Click:Connect(function()
-	local SelectedObjects = Selection:Get()
-
-	if #SelectedObjects == 0 then
-		error("Please select an object to fix")
-	elseif #SelectedObjects > 1 then
-		error("Please select only one object")
-	elseif SelectedObjects[1].Name == "GearUtilityPlugin" then
-		error("You cannot fix this script")
+	if FixObjectCooldown then
+		warn("Fix operation is still running. Please wait before trying again.")
+		return
 	end
 
-	if Fix(SelectedObjects[1]) then
-		UpdateModulePackage()
+	FixObjectCooldown = true
+
+	local Success, Error = xpcall(function()
+		local SelectedObjects = Selection:Get()
+
+		if #SelectedObjects == 0 then
+			error("Please select an object to fix")
+		elseif #SelectedObjects > 1 then
+			error("Please select only one object")
+		elseif SelectedObjects[1] == script then
+			error("You cannot fix this script")
+		end
+
+		if Fix(SelectedObjects[1]) then
+			LoadModules()
+		end
+	end, debug.traceback)
+
+	FixObjectCooldown = false
+
+	if not Success then
+		warn(`Failed to run fix operation:\n{Error}`)
 	end
 end)
 
-UpdateModulePackagesButton.Click:Connect(function()
-	UpdateModulePackage()
+LoadModulesButton.Click:Connect(function()
+	LoadModules()
 end)
