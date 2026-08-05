@@ -33,7 +33,7 @@ The plugin adds four toolbar buttons
 - **Update Packages** updates the gear module packages in `ReplicatedStorage.GearModulesFolder`.
 
 The plugin fixes supported scripts by
-- replacing `require()` calls with auto preloaded modules (or manually with Update Packages function).
+- replacing `require()` calls with [auto preloaded modules (or manually load the modules with Update Packages function)].
 - Fix LoadLibrary usage
 - other small script fixes
 
