@@ -50,13 +50,13 @@ local TreeTab = "\t\t\t\t\t"
 local READMESource = [[
 	--[[
 		This folder contains gears that GearUtility failed to load in.
-	
+
 		It is normal for the following gears to fail to load because Roblox made them so:
 			- 103360212 skull rug
 			- 27476125 NoobTube
 			- 44084677 Tomahawk
 			- 91366868 Gear
-	
+
 		If you see any other gears that failed to load in that is not listed above, just re-run "Load Gears" and the plugin will try to load them in again
 	\]\]--
 ]]
@@ -276,6 +276,28 @@ local function LoadGears(FixGears)
 		ChangeHistoryService:SetWaypoint("Created FailedGears folder")
 	end
 
+	local FailedGears = FailedGearsFolder:GetChildren()
+	local README = FailedGearsFolder:FindFirstChild("README")
+
+	if not README then
+		CheckScriptPermission()
+
+		README = Instance.new("LocalScript")
+		README.Name = "README"
+		README.Disabled = true
+		README.Source = READMESource
+		README.Parent = FailedGearsFolder
+	else
+		README.Source = READMESource
+	end
+
+	if #FailedGears > 1 or (#FailedGears > 0 and not README) then
+		print(
+			`Found {#FailedGears} failed gears`
+				.. "; the plugin will try to load them again"
+		)
+	end
+
 	if not GearsFolderAlreadyExists then
 		GearsFolder = Instance.new("Folder")
 		GearsFolder.Name = "GearsFolder"
@@ -341,30 +363,6 @@ local function LoadGears(FixGears)
 	)
 
 	Gears.data = FilteredGears
-
-	if FailedGearsFolderAlreadyExists then
-		local FailedGears = FailedGearsFolder:GetChildren()
-		local README = FailedGearsFolder:FindFirstChild("README")
-
-		if not README then
-			CheckScriptPermission()
-
-			README = Instance.new("LocalScript")
-			README.Name = "README"
-			README.Disabled = true
-			README.Source = READMESource
-			README.Parent = FailedGearsFolder
-		else
-			README.Source = READMESource
-		end
-
-		if #FailedGears > 1 or (#FailedGears > 0 and not README) then
-			print(
-				`Found {#FailedGears} failed gears`
-					.. "; the plugin will try to load them again"
-			)
-		end
-	end
 
 	if GearsFolderAlreadyExists then
 		print(
