@@ -56,6 +56,22 @@ local READMESource = [[
 			- 27476125 NoobTube
 			- 44084677 Tomahawk
 			- 91366868 Gear
+			- 445119186 .
+			- 445120580 .
+			- 445146200 .
+			- 2535472650 The Great Sword Justice
+			- 2845969550 Badimo Arm Cannon
+			- 806882461 __
+			- 445136641 .
+			- 2936947382 Gear of Mystery
+			- 23307906 Cooooool!!!
+			- 445122594  .
+			- 445122795 .
+			- 445132899 .
+			- 806754856 _
+			- 445118914 .
+			- 445127715 .
+			- 445118715 .
 
 		If you see any other gears that failed to load in that is not listed above, just re-run "Load Gears" and the plugin will try to load them in again
 	\]\]--
@@ -408,6 +424,8 @@ local function LoadGears(FixGears)
 				local FailedGearEntry = FailedGearsFolder:FindFirstChild(FormatGearEntryName(Gear))
 				local GearPreviouslyFailed = FailedGearEntry ~= nil
 
+				local IsGear = false
+
 				if not LoadSucceeded then
 					CreateGearEntry(Gear, FailedGearsFolder)
 					return "load_failed", InsertedModelOrError
@@ -416,13 +434,28 @@ local function LoadGears(FixGears)
 				local InsertedModel = InsertedModelOrError
 				local NewGearEntry = CreateGearEntry(Gear, GearsFolder)
 
+
 				for _, Child in ipairs(InsertedModel:GetChildren()) do
 					if Child:IsA("Tool") or Child:IsA("HopperBin") then
+						IsGear = true
+
 						Child.Parent = NewGearEntry
 					end
 				end
 
+				if not IsGear then
+						NewGearEntry.Parent = FailedGearsFolder
+
+						for _, Child in ipairs(InsertedModel:GetChildren()) do
+							Child.Parent = NewGearEntry
+						end
+				end
+
 				InsertedModel:Destroy()
+
+				if not IsGear then
+					return "load_failed", `Asset is not a gear (didn't find either a "Tool" or a "HopperBin" in the model)`
+				end
 
 				if FailedGearEntry then
 					FailedGearEntry:Destroy()
