@@ -24,7 +24,9 @@ There are also other random things I scraped, like faces, hairs, and heads, but 
 
 ## Plugin
 
-There is also a plugin that can be used to load the gears into your game and fix supported scripts on the fly! (script manipulation)
+The plugin needs permission to make HTTP requests and to create and edit scripts. Install the plugin from this link https://create.roblox.com/store/asset/9513198930 as it includes the packaged modules needed to fix the gears. Don't install the plugin from a local file because it wont work
+
+The plugin can be used to load the gears into your game and fix supported scripts on the fly! (script manipulation)
 
 The plugin adds four toolbar buttons
 - **Load Gears** loads gears into `ServerStorage.GearsFolder` and fixes supported scripts.
@@ -38,8 +40,6 @@ The plugin fixes supported scripts by
 - other small script fixes
 
 Gears that fail to load are stored in `ServerStorage.FailedGears`. Run **Load Gears** again to retry them. If `ServerStorage.GearsFolder` already exists, the plugin only loads gears that are not already there. Delete the folder and run **Load Gears** again if you want to reload and fix every gear.
-
-The plugin needs permission to make HTTP requests and to create and edit scripts. Install the plugin from this link https://create.roblox.com/store/asset/9513198930 as it includes the packaged modules needed to fix the gears.
 
 I might consider fixing Non-FE gears and client-sided InsertService gears in the future
 
